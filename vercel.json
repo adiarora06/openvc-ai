@@ -1,0 +1,9 @@
+{
+  "experimentalServices": {
+    "api": {
+      "entrypoint": "api/index.py",
+      "routePrefix": "/",
+      "includeFiles": ["src/openvc_ai/api/static/**"]
+    }
+  }
+}
