@@ -96,13 +96,16 @@ async function renderTopStocks() {
   const c = document.getElementById('top-stocks'); if (!c) return; c.innerHTML = '';
   const results = [];
   for (const t of TOP_TICKERS.slice(0,10)) {
-    try { const r = await fetch('/quote?ticker=' + t.t); if (!r.ok) continue; const j = await r.json(); if (j.current != null) results.push({...t, current: j.current, previous: j.previous}); } catch(e) {}
+    try { const r = await fetch('/quote?ticker=' + t.t); if (!r.ok) continue; const j = await r.json(); if (j.current != null) results.push({...t, current: j.current, previous: j.previous, source: j.source, as_of: j.as_of}); } catch(e) {}
   }
   results.forEach(item => {
     const card = el('div','ticker-card'); card.appendChild(el('div','ticker-symbol',item.t)); card.appendChild(el('div','ticker-name',item.name));
     const p = el('div','ticker-price','$' + item.current.toFixed(2));
     if (item.previous != null) p.classList.add(item.current > item.previous ? 'up' : 'down');
-    card.appendChild(p); card.onclick = () => postForecast(item.t); c.appendChild(card);
+    card.appendChild(p);
+    if (item.source === 'demo') card.appendChild(el('div','ticker-source demo','DEMO'));
+    else if (item.as_of) card.appendChild(el('div','ticker-source','As of ' + item.as_of));
+    card.onclick = () => postForecast(item.t); c.appendChild(card);
   });
 }
 

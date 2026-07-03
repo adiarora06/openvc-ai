@@ -103,6 +103,8 @@ body { margin: 0; font-family: var(--font); background: var(--bg-alt); color: va
 .ticker-price { font-weight: 700; font-size: 1rem; margin-top: 6px; font-family: var(--mono); }
 .ticker-price.up { color: var(--success); }
 .ticker-price.down { color: var(--danger); }
+.ticker-source { margin-top: 5px; font-size: 0.62rem; color: var(--text-muted); font-family: var(--mono); }
+.ticker-source.demo { display: inline-flex; width: fit-content; padding: 2px 5px; border-radius: 4px; background: #fef3c7; color: #92400e; font-weight: 700; }
 
 /* Forecast */
 .forecast-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; align-items: start; }

@@ -100,6 +100,62 @@ class AlphaVantageMarketDataAdapter:
     """Daily price data via Alpha Vantage with TTL caching."""
 
     _cache: TTLCache[list[PricePoint]] = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
+    _quote_cache: TTLCache[dict] = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
+
+    async def quote(self, ticker: str) -> dict:
+        """Return a current quote from Alpha Vantage or clearly-marked demo data."""
+        ticker = ticker.upper()
+        if not settings.alpha_vantage_api_key:
+            if settings.demo_mode:
+                points = _demo_price_points(ticker)
+                return {
+                    "ticker": ticker,
+                    "current": points[-1].close,
+                    "previous": points[-2].close if len(points) > 1 else None,
+                    "source": "demo",
+                    "as_of": points[-1].timestamp.isoformat(),
+                }
+            raise RuntimeError("ALPHA_VANTAGE_API_KEY is not configured")
+
+        cache_key = f"quote:{ticker}"
+
+        async def _fetch() -> dict:
+            params = {
+                "function": "GLOBAL_QUOTE",
+                "symbol": ticker,
+                "apikey": settings.alpha_vantage_api_key,
+            }
+            response = await _get_with_retry("https://www.alphavantage.co/query", params)
+            data = response.json()
+            quote = data.get("Global Quote") or {}
+            price = quote.get("05. price")
+            previous = quote.get("08. previous close")
+            if not price:
+                message = data.get("Note") or data.get("Error Message") or str(data)[:300]
+                raise RuntimeError(f"Alpha Vantage returned no quote: {message}")
+
+            return {
+                "ticker": quote.get("01. symbol", ticker).upper(),
+                "current": float(price),
+                "previous": float(previous) if previous else None,
+                "source": "alpha_vantage",
+                "as_of": quote.get("07. latest trading day"),
+            }
+
+        try:
+            return await self._quote_cache.get_or_compute(cache_key, _fetch)
+        except Exception:
+            if settings.demo_mode:
+                logger.warning("Alpha Vantage quote unavailable; falling back to demo for %s", ticker)
+                points = _demo_price_points(ticker)
+                return {
+                    "ticker": ticker,
+                    "current": points[-1].close,
+                    "previous": points[-2].close if len(points) > 1 else None,
+                    "source": "demo",
+                    "as_of": points[-1].timestamp.isoformat(),
+                }
+            raise
 
     async def daily_prices(self, ticker: str, outputsize: str = "compact") -> list[PricePoint]:
         ticker = ticker.upper()

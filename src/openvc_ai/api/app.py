@@ -241,19 +241,12 @@ async def forecast(request: Request, payload: ForecastRequest):
 
 @app.get("/quote")
 async def quote(ticker: str):
-    """Return a lightweight quote: latest close and previous close (if available)."""
+    """Return a lightweight quote with data-source metadata."""
     adapter = AlphaVantageMarketDataAdapter()
     try:
-        points = await adapter.daily_prices(ticker, outputsize="compact")
+        return await adapter.quote(ticker)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))
-
-    if not points:
-        raise HTTPException(status_code=404, detail="No price data")
-
-    latest = points[-1].close
-    previous = points[-2].close if len(points) > 1 else None
-    return {"ticker": ticker.upper(), "current": latest, "previous": previous}
 
 
 @app.post("/chat")
@@ -386,4 +379,3 @@ async def add_memory(request: Request, session_id: str, payload: dict):
         raise HTTPException(status_code=400, detail="Content is required")
     record = await asyncio.to_thread(runtime.memory.add, session_id, kind, content, metadata)
     return record.model_dump(mode="json")
-
