@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AgentStatus(str, Enum):
@@ -153,6 +153,8 @@ class ForecastResult(BaseModel):
 
 class BacktestRequest(BaseModel):
     ticker: str = Field(..., examples=["NVDA"], min_length=1, max_length=12)
+    start_date: date | None = Field(default=None, description="First forecast date to evaluate.")
+    end_date: date | None = Field(default=None, description="Last forecast date to evaluate.")
     horizon_days: int = Field(10, ge=1, le=252)
     training_window_days: int = Field(60, ge=30, le=1500)
     stride_days: int = Field(10, ge=1, le=252)
@@ -165,6 +167,12 @@ class BacktestRequest(BaseModel):
         if not cleaned.replace(".", "").replace("-", "").isalnum():
             raise ValueError("Ticker may only contain letters, numbers, '.' and '-'.")
         return cleaned
+
+    @model_validator(mode="after")
+    def validate_date_range(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
 
 
 class BacktestWindowResult(BaseModel):
@@ -198,6 +206,8 @@ class BacktestResult(BaseModel):
     average_predicted_return: float
     average_actual_return: float
     data_points: int
+    data_start: date | None = None
+    data_end: date | None = None
     first_forecast_date: date | None = None
     last_forecast_date: date | None = None
     window_results: list[BacktestWindowResult] = Field(default_factory=list)

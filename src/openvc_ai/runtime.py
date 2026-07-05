@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import date, timedelta
 from typing import Any
 
 from openvc_ai import __version__
@@ -177,7 +178,14 @@ class AppRuntime:
         return [point.model_dump(mode="json") for point in points]
 
     async def backtest_forecast_model(self, request: BacktestRequest) -> BacktestResult:
-        points = await self.market_data.daily_prices(request.ticker, outputsize="compact")
+        start_date: date | None = None
+        end_date: date | None = None
+        if request.start_date or request.end_date:
+            eval_start = request.start_date or (date.today() - timedelta(days=180))
+            eval_end = request.end_date or date.today()
+            start_date = eval_start - timedelta(days=max(request.training_window_days * 3, 120))
+            end_date = eval_end + timedelta(days=max(request.horizon_days * 3, 14))
+        points = await self.market_data.historical_prices(request.ticker, start_date, end_date)
         frame = price_points_to_frame(points)
         return await asyncio.to_thread(self.backtester.run, frame, request)
 

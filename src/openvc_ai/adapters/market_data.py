@@ -100,6 +100,7 @@ class AlphaVantageMarketDataAdapter:
     """Daily price data via Alpha Vantage with TTL caching."""
 
     _cache: TTLCache[list[PricePoint]] = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
+    _historical_cache: TTLCache[list[PricePoint]] = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
     _quote_cache: TTLCache[dict] = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
 
     async def quote(self, ticker: str) -> dict:
@@ -193,6 +194,79 @@ class AlphaVantageMarketDataAdapter:
             if settings.demo_mode:
                 logger.warning("Alpha Vantage unavailable; falling back to demo prices for %s", ticker)
                 return _demo_price_points(ticker)
+            raise
+
+    async def historical_prices(
+        self,
+        ticker: str,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[PricePoint]:
+        """Fetch historical daily closes for arbitrary backtest ranges.
+
+        Alpha Vantage full-history daily data is premium-gated on some accounts, so
+        backtesting uses Yahoo's chart endpoint when a date range is requested.
+        """
+        ticker = ticker.upper()
+        if start_date is None and end_date is None:
+            return await self.daily_prices(ticker, outputsize="compact")
+
+        if start_date is None:
+            start_date = date.today() - timedelta(days=365)
+        if end_date is None:
+            end_date = date.today()
+        if end_date < start_date:
+            raise ValueError("end_date must be on or after start_date")
+
+        cache_key = f"historical:{ticker}:{start_date.isoformat()}:{end_date.isoformat()}"
+
+        async def _fetch() -> list[PricePoint]:
+            period1 = int(datetime.combine(start_date, datetime.min.time(), timezone.utc).timestamp())
+            period2 = int(
+                datetime.combine(end_date + timedelta(days=1), datetime.min.time(), timezone.utc)
+                .timestamp()
+            )
+            response = await _get_with_retry(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+                {
+                    "period1": period1,
+                    "period2": period2,
+                    "interval": "1d",
+                    "events": "history",
+                    "includeAdjustedClose": "true",
+                },
+            )
+            data = response.json()
+            result = (data.get("chart", {}).get("result") or [None])[0]
+            if not result:
+                error = data.get("chart", {}).get("error") or data
+                raise RuntimeError(f"Yahoo Finance returned no chart data: {error}")
+
+            timestamps = result.get("timestamp") or []
+            quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
+            closes = quote.get("close") or []
+            points = [
+                PricePoint(
+                    timestamp=datetime.fromtimestamp(ts, tz=timezone.utc).date(),
+                    close=float(close),
+                )
+                for ts, close in zip(timestamps, closes)
+                if close is not None
+            ]
+            if not points:
+                raise RuntimeError("Yahoo Finance returned no daily closes")
+            return sorted(points, key=lambda p: p.timestamp)
+
+        try:
+            return await self._historical_cache.get_or_compute(cache_key, _fetch)
+        except Exception:
+            if settings.demo_mode:
+                logger.warning("Historical data unavailable; falling back to demo prices for %s", ticker)
+                return [
+                    point
+                    for point in _demo_price_points(ticker, days=max(120, (end_date - start_date).days))
+                    if start_date <= point.timestamp <= end_date
+                ]
             raise
 
     async def health(self) -> DependencyHealth:

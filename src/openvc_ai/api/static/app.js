@@ -137,6 +137,148 @@ function updateChart(data) {
   forecastChart = new Chart(ctx, {type:'line',data:{datasets:ds},options:opts});
 }
 
+// === BACKTEST ===
+let backtestChart = null;
+
+function isoDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtMoney(v) {
+  return v == null || Number.isNaN(v) ? 'N/A' : '$' + Number(v).toFixed(2);
+}
+
+function fmtPct(v) {
+  return v == null || Number.isNaN(v) ? 'N/A' : (Number(v) * 100).toFixed(1) + '%';
+}
+
+function initBacktest() {
+  const end = new Date();
+  end.setDate(end.getDate() - 14);
+  const start = new Date(end);
+  start.setMonth(start.getMonth() - 6);
+  const startEl = document.getElementById('bt-start');
+  const endEl = document.getElementById('bt-end');
+  if (startEl && !startEl.value) startEl.value = isoDate(start);
+  if (endEl && !endEl.value) endEl.value = isoDate(end);
+  document.getElementById('backtest-run')?.addEventListener('click', runBacktest);
+  document.getElementById('backtest-run-top')?.addEventListener('click', runBacktest);
+  document.getElementById('bt-ticker')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') runBacktest();
+  });
+}
+
+function backtestPayload() {
+  const ticker = document.getElementById('bt-ticker').value.trim().toUpperCase();
+  const start = document.getElementById('bt-start').value;
+  const end = document.getElementById('bt-end').value;
+  if (!ticker) throw new Error('Ticker is required');
+  if (!start || !end) throw new Error('Start and end dates are required');
+  return {
+    ticker,
+    start_date: start,
+    end_date: end,
+    horizon_days: parseInt(document.getElementById('bt-horizon').value || '10'),
+    training_window_days: parseInt(document.getElementById('bt-training').value || '60'),
+    stride_days: parseInt(document.getElementById('bt-stride').value || '10'),
+    max_windows: parseInt(document.getElementById('bt-windows').value || '12'),
+  };
+}
+
+async function runBacktest() {
+  const summary = document.getElementById('backtest-summary');
+  const table = document.getElementById('backtest-table');
+  try {
+    const payload = backtestPayload();
+    summary.innerHTML = '<div class="empty-state"><p>Running backtest for ' + payload.ticker + '...</p></div>';
+    table.innerHTML = '<div class="empty-state"><p>Loading windows...</p></div>';
+    sbSetActivity('Backtesting ' + payload.ticker + '...', true);
+    const resp = await fetch('/backtest', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const raw = await resp.text();
+    if (!resp.ok) {
+      let detail = raw;
+      try { detail = JSON.parse(raw).detail || raw; } catch (_) {}
+      throw new Error(detail || 'HTTP ' + resp.status);
+    }
+    const data = JSON.parse(raw);
+    renderBacktest(data);
+    sbSetActivity('Backtest ready - ' + data.ticker, false);
+  } catch (err) {
+    summary.innerHTML = '<div class="empty-state" style="color:var(--danger)"><p>' + err.message + '</p></div>';
+    table.innerHTML = '<div class="empty-state"><p>No windows available.</p></div>';
+    sbSetActivity('Backtest error', false);
+  }
+}
+
+function renderBacktest(data) {
+  const summary = document.getElementById('backtest-summary');
+  const table = document.getElementById('backtest-table');
+  const directionClass = data.directional_accuracy >= 0.5 ? 'positive' : 'negative';
+  const coverageClass = data.interval_coverage >= 0.7 ? 'positive' : 'negative';
+  summary.innerHTML =
+    '<div class="metric-grid backtest-metrics">' +
+      '<div class="metric-box"><div class="metric-label">Ticker</div><div class="metric-value">' + data.ticker + '</div></div>' +
+      '<div class="metric-box"><div class="metric-label">Windows</div><div class="metric-value">' + data.windows + '</div></div>' +
+      '<div class="metric-box"><div class="metric-label">MAE</div><div class="metric-value">' + fmtMoney(data.mae) + '</div></div>' +
+      '<div class="metric-box"><div class="metric-label">RMSE</div><div class="metric-value">' + fmtMoney(data.rmse) + '</div></div>' +
+      '<div class="metric-box"><div class="metric-label">MAPE</div><div class="metric-value">' + fmtPct(data.mape) + '</div></div>' +
+      '<div class="metric-box"><div class="metric-label">Direction</div><div class="metric-value ' + directionClass + '">' + fmtPct(data.directional_accuracy) + '</div></div>' +
+      '<div class="metric-box"><div class="metric-label">Coverage</div><div class="metric-value ' + coverageClass + '">' + fmtPct(data.interval_coverage) + '</div></div>' +
+      '<div class="metric-box"><div class="metric-label">Avg Actual Return</div><div class="metric-value ' + (data.average_actual_return >= 0 ? 'positive' : 'negative') + '">' + fmtPct(data.average_actual_return) + '</div></div>' +
+    '</div>' +
+    '<div class="backtest-note">Evaluated forecast dates from ' + (data.first_forecast_date || 'N/A') + ' to ' + (data.last_forecast_date || 'N/A') + ' using ' + data.data_points + ' historical price points.</div>';
+
+  const rows = data.window_results || [];
+  if (!rows.length) {
+    table.innerHTML = '<div class="empty-state"><p>No evaluation windows returned.</p></div>';
+  } else {
+    table.innerHTML = '<table class="backtest-table"><thead><tr><th>Forecast</th><th>Target</th><th>Start</th><th>Predicted</th><th>Actual</th><th>Error</th><th>Dir</th><th>Band</th></tr></thead><tbody>' +
+      rows.map(w => '<tr>' +
+        '<td>' + w.forecast_date + '</td>' +
+        '<td>' + w.target_date + '</td>' +
+        '<td>' + fmtMoney(w.start_price) + '</td>' +
+        '<td>' + fmtMoney(w.predicted_price) + '</td>' +
+        '<td>' + fmtMoney(w.actual_price) + '</td>' +
+        '<td>' + fmtPct(w.percentage_error) + '</td>' +
+        '<td><span class="bt-pill ' + (w.direction_correct ? 'ok' : 'bad') + '">' + (w.direction_correct ? 'Hit' : 'Miss') + '</span></td>' +
+        '<td><span class="bt-pill ' + (w.interval_hit ? 'ok' : 'bad') + '">' + (w.interval_hit ? 'Inside' : 'Outside') + '</span></td>' +
+      '</tr>').join('') +
+    '</tbody></table>';
+  }
+  updateBacktestChart(data);
+}
+
+function updateBacktestChart(data) {
+  const canvas = document.getElementById('backtestChart');
+  if (!canvas) return;
+  const rows = data.window_results || [];
+  document.getElementById('backtest-chart-title').textContent = data.ticker + ' backtest - predicted vs actual';
+  const actual = rows.map(w => ({x: new Date(w.target_date), y: w.actual_price}));
+  const predicted = rows.map(w => ({x: new Date(w.target_date), y: w.predicted_price}));
+  const lower = rows.map(w => ({x: new Date(w.target_date), y: w.lower_bound}));
+  const upper = rows.map(w => ({x: new Date(w.target_date), y: w.upper_bound}));
+  const ds = [
+    {label:'Actual', data:actual, borderColor:'#111827', backgroundColor:'#111827', pointRadius:4, borderWidth:2, tension:0.2},
+    {label:'Predicted', data:predicted, borderColor:'#059669', backgroundColor:'#059669', pointRadius:4, borderWidth:2, borderDash:[6,4], tension:0.2},
+    {label:'10th %', data:lower, borderColor:'rgba(220,38,38,0.45)', pointRadius:0, borderWidth:1.5, borderDash:[4,4], tension:0.2},
+    {label:'90th %', data:upper, borderColor:'rgba(5,150,105,0.45)', backgroundColor:'rgba(5,150,105,0.04)', pointRadius:0, borderWidth:1.5, borderDash:[4,4], fill:'-1', tension:0.2},
+  ];
+  const opts = {maintainAspectRatio:false,responsive:true,interaction:{mode:'index',intersect:false},
+    scales:{x:{type:'time',time:{unit:'day'},ticks:{color:'#9ca3af',font:{size:10}},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9ca3af',font:{size:10},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(0,0,0,0.04)'}}},
+    plugins:{legend:{position:'top',align:'end',labels:{color:'#6b7280',font:{size:10},boxWidth:10,usePointStyle:true}},tooltip:{backgroundColor:'#111827',titleColor:'#fff',bodyColor:'#d1d5db',padding:10,cornerRadius:6,callbacks:{label:c=>' ' + c.dataset.label + ': $' + c.parsed.y.toFixed(2)}}}};
+  if (backtestChart) {
+    backtestChart.data.datasets = ds;
+    backtestChart.options = opts;
+    backtestChart.update();
+    return;
+  }
+  backtestChart = new Chart(canvas.getContext('2d'), {type:'line',data:{datasets:ds},options:opts});
+}
+
 // === CHIP SYNC ===
 function syncChips() { document.querySelectorAll('.chip').forEach(c => { const i = c.querySelector('input'); if(!i)return; const u=()=>c.classList.toggle('active',i.checked); i.addEventListener('change',u); u(); }); }
 
@@ -366,7 +508,7 @@ async function addLTM() {
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', () => {
-  renderTopStocks(); syncChips(); loadStatus(); setInterval(loadStatus, 30000);
+  renderTopStocks(); syncChips(); initBacktest(); loadStatus(); setInterval(loadStatus, 30000);
   ['toggle-history','toggle-median','toggle-band','toggle-simpaths'].forEach(id => { const e = document.getElementById(id); if(e) e.addEventListener('change', () => { if(lastPayload) updateChart(lastPayload); }); });
   document.getElementById('search').addEventListener('input', e => {});
   document.getElementById('search').addEventListener('keydown', e => { if(e.key==='Enter'){const v=e.target.value.trim().toUpperCase();if(v)postForecast(v);} });

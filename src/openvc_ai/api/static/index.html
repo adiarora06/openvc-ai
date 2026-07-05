@@ -18,6 +18,7 @@
         </div>
         <div class="nav-tabs">
           <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
+          <button class="nav-tab" data-tab="backtest">Backtest</button>
           <button class="nav-tab" data-tab="topology">Topology</button>
           <button class="nav-tab" data-tab="audit">Audit Log</button>
           <button class="nav-tab" data-tab="memory">Memory</button>
@@ -69,6 +70,55 @@
 
         <section class="section" id="status-panel-section">
           <div id="status-panel" class="diagnostics-grid"></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- TAB: Backtest -->
+    <main class="tab-content" id="tab-backtest">
+      <div class="page-container">
+        <section class="section">
+          <div class="section-header-row">
+            <div>
+              <h2 class="section-title">Forecast Backtest</h2>
+              <p class="section-desc">Run walk-forward tests over historical windows and compare predicted prices against realized prices.</p>
+            </div>
+            <button class="btn-icon" id="backtest-run-top" title="Run backtest">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 3 14 9-14 9V3z"/></svg>
+              <span>Run</span>
+            </button>
+          </div>
+          <div class="backtest-controls">
+            <label class="control-label"><span>Ticker</span><input id="bt-ticker" class="control-input bt-ticker-input" type="text" value="AMZN" maxlength="12" /></label>
+            <label class="control-label"><span>Start</span><input id="bt-start" class="control-input bt-date-input" type="date" /></label>
+            <label class="control-label"><span>End</span><input id="bt-end" class="control-input bt-date-input" type="date" /></label>
+            <label class="control-label"><span>Horizon</span><input id="bt-horizon" class="control-input" type="number" value="10" min="1" max="252" /><span class="unit">days</span></label>
+            <label class="control-label"><span>Training</span><input id="bt-training" class="control-input" type="number" value="60" min="30" max="1500" /><span class="unit">days</span></label>
+            <label class="control-label"><span>Stride</span><input id="bt-stride" class="control-input" type="number" value="10" min="1" max="252" /><span class="unit">days</span></label>
+            <label class="control-label"><span>Windows</span><input id="bt-windows" class="control-input" type="number" value="12" min="1" max="100" /></label>
+            <button class="btn-sm" id="backtest-run">Run Backtest</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div id="backtest-summary" class="backtest-summary">
+            <div class="empty-state"><p>Choose a ticker and date range, then run a backtest.</p></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="backtest-layout">
+            <div class="chart-panel backtest-chart-panel">
+              <div class="chart-header"><span id="backtest-chart-title">Backtest results</span></div>
+              <canvas id="backtestChart"></canvas>
+            </div>
+            <div class="backtest-table-panel">
+              <div class="chart-header">Evaluation Windows</div>
+              <div id="backtest-table" class="backtest-table-wrap">
+                <div class="empty-state"><p>No windows yet.</p></div>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </main>

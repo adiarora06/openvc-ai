@@ -35,6 +35,23 @@ def test_backtest_returns_metrics_and_windows():
     assert len(result.window_results) == 4
 
 
+def test_backtest_filters_forecast_dates():
+    request = BacktestRequest(
+        ticker="NVDA",
+        start_date=date(2024, 4, 1),
+        end_date=date(2024, 4, 30),
+        horizon_days=5,
+        training_window_days=45,
+        stride_days=5,
+        max_windows=20,
+    )
+
+    result = ForecastBacktester().run(_make_prices(), request)
+
+    assert result.window_results
+    assert all(request.start_date <= w.forecast_date <= request.end_date for w in result.window_results)
+
+
 def test_backtest_requires_enough_history():
     request = BacktestRequest(ticker="NVDA", horizon_days=30, training_window_days=100)
 

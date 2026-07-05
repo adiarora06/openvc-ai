@@ -26,7 +26,14 @@ class ForecastBacktester:
         windows: list[BacktestWindowResult] = []
         earliest_cutoff = request.training_window_days - 1
         latest_cutoff = len(frame) - request.horizon_days - 1
-        cutoff_indexes = list(range(earliest_cutoff, latest_cutoff + 1, request.stride_days))
+        cutoff_indexes = []
+        for cutoff_idx in range(earliest_cutoff, latest_cutoff + 1, request.stride_days):
+            forecast_date = frame.iloc[cutoff_idx]["date"]
+            if request.start_date and forecast_date < request.start_date:
+                continue
+            if request.end_date and forecast_date > request.end_date:
+                continue
+            cutoff_indexes.append(cutoff_idx)
         if len(cutoff_indexes) > request.max_windows:
             cutoff_indexes = cutoff_indexes[-request.max_windows :]
 
@@ -95,6 +102,8 @@ class ForecastBacktester:
             average_predicted_return=average_predicted_return,
             average_actual_return=average_actual_return,
             data_points=len(frame),
+            data_start=frame.iloc[0]["date"],
+            data_end=frame.iloc[-1]["date"],
             first_forecast_date=windows[0].forecast_date,
             last_forecast_date=windows[-1].forecast_date,
             window_results=windows,
