@@ -177,7 +177,7 @@ class AppRuntime:
         return [point.model_dump(mode="json") for point in points]
 
     async def backtest_forecast_model(self, request: BacktestRequest) -> BacktestResult:
-        points = await self.market_data.daily_prices(request.ticker, outputsize="full")
+        points = await self.market_data.daily_prices(request.ticker, outputsize="compact")
         frame = price_points_to_frame(points)
         return await asyncio.to_thread(self.backtester.run, frame, request)
 

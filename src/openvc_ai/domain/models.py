@@ -153,10 +153,10 @@ class ForecastResult(BaseModel):
 
 class BacktestRequest(BaseModel):
     ticker: str = Field(..., examples=["NVDA"], min_length=1, max_length=12)
-    horizon_days: int = Field(30, ge=1, le=252)
-    training_window_days: int = Field(252, ge=30, le=1500)
-    stride_days: int = Field(21, ge=1, le=252)
-    max_windows: int = Field(24, ge=1, le=100)
+    horizon_days: int = Field(10, ge=1, le=252)
+    training_window_days: int = Field(60, ge=30, le=1500)
+    stride_days: int = Field(10, ge=1, le=252)
+    max_windows: int = Field(12, ge=1, le=100)
 
     @field_validator("ticker")
     @classmethod
