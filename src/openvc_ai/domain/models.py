@@ -151,6 +151,58 @@ class ForecastResult(BaseModel):
     assigned_agents: list[str] = Field(default_factory=list)
 
 
+class BacktestRequest(BaseModel):
+    ticker: str = Field(..., examples=["NVDA"], min_length=1, max_length=12)
+    horizon_days: int = Field(30, ge=1, le=252)
+    training_window_days: int = Field(252, ge=30, le=1500)
+    stride_days: int = Field(21, ge=1, le=252)
+    max_windows: int = Field(24, ge=1, le=100)
+
+    @field_validator("ticker")
+    @classmethod
+    def normalize_ticker(cls, value: str) -> str:
+        cleaned = value.strip().upper()
+        if not cleaned.replace(".", "").replace("-", "").isalnum():
+            raise ValueError("Ticker may only contain letters, numbers, '.' and '-'.")
+        return cleaned
+
+
+class BacktestWindowResult(BaseModel):
+    train_start: date
+    forecast_date: date
+    target_date: date
+    start_price: float
+    predicted_price: float
+    actual_price: float
+    lower_bound: float
+    upper_bound: float
+    absolute_error: float
+    percentage_error: float
+    predicted_return: float
+    actual_return: float
+    direction_correct: bool
+    interval_hit: bool
+
+
+class BacktestResult(BaseModel):
+    ticker: str
+    horizon_days: int
+    training_window_days: int
+    stride_days: int
+    windows: int
+    mae: float
+    rmse: float
+    mape: float
+    directional_accuracy: float
+    interval_coverage: float
+    average_predicted_return: float
+    average_actual_return: float
+    data_points: int
+    first_forecast_date: date | None = None
+    last_forecast_date: date | None = None
+    window_results: list[BacktestWindowResult] = Field(default_factory=list)
+
+
 class DependencyHealth(BaseModel):
     name: str
     status: ProviderStatus

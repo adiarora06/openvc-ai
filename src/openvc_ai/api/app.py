@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from openvc_ai.adapters.market_data import AlphaVantageMarketDataAdapter, close_http_client
 from openvc_ai.config.logging_config import configure_logging, get_logger
 from openvc_ai.config.settings import settings
-from openvc_ai.domain.models import A2ATaskRequest, ForecastRequest, ToolInvocation
+from openvc_ai.domain.models import A2ATaskRequest, BacktestRequest, ForecastRequest, ToolInvocation
 from openvc_ai.runtime import AppRuntime
 
 # Simple in-process rate limiter: max 20 chat requests per minute per IP
@@ -232,6 +232,19 @@ async def forecast(request: Request, payload: ForecastRequest):
     runtime = get_runtime(request)
     try:
         result = await runtime.orchestrator.forecast_stock(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return result.model_dump(mode="json")
+
+
+@app.post("/backtest")
+async def backtest(request: Request, payload: BacktestRequest):
+    """Run a walk-forward historical backtest for the quantitative forecast model."""
+    runtime = get_runtime(request)
+    try:
+        result = await runtime.backtest_forecast_model(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except RuntimeError as exc:

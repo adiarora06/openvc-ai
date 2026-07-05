@@ -25,6 +25,8 @@ from openvc_ai.domain.models import (
     AgentStatus,
     DependencyHealth,
     ForecastResult,
+    BacktestRequest,
+    BacktestResult,
     NewsItem,
     PricePoint,
     ProviderStatus,
@@ -37,6 +39,7 @@ from openvc_ai.llm.adapters import (
     MockLLMAdapter,
     OpenAILLMAdapter,
 )
+from openvc_ai.evaluation.backtesting import ForecastBacktester
 from openvc_ai.memory.in_memory import InMemoryMemoryStore
 from openvc_ai.memory.postgres_store import PostgresMemoryStore
 from openvc_ai.memory.sqlite_store import SQLiteMemoryStore
@@ -64,6 +67,7 @@ class AppRuntime:
 
         # Agents.
         self.quant_agent = QuantForecastAgent()
+        self.backtester = ForecastBacktester(self.quant_agent)
         self.news_agent = NewsAnalysisAgent(self.llm_router)
         self.memo_agent = InvestmentMemoAgent(self.llm_router)
 
@@ -171,6 +175,11 @@ class AppRuntime:
     async def _price_history_tool(self, ticker: str, outputsize: str = "compact") -> list[dict]:
         points = await self.market_data.daily_prices(ticker, outputsize=outputsize)
         return [point.model_dump(mode="json") for point in points]
+
+    async def backtest_forecast_model(self, request: BacktestRequest) -> BacktestResult:
+        points = await self.market_data.daily_prices(request.ticker, outputsize="full")
+        frame = price_points_to_frame(points)
+        return await asyncio.to_thread(self.backtester.run, frame, request)
 
     async def _company_news_tool(self, ticker: str, days_back: int = 14) -> list[dict]:
         items = await self.news_data.company_news(ticker, days_back=days_back)
