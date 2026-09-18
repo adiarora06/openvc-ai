@@ -6,9 +6,14 @@ Redis, Postgres, or an event bus without changing API models.
 
 from __future__ import annotations
 
-from datetime import datetime
-
-from openvc_ai.domain.models import A2ATask, A2ATaskEvent, A2ATaskRequest, TaskPlan, TaskStatus
+from openvc_ai.domain.models import (
+    A2ATask,
+    A2ATaskEvent,
+    A2ATaskRequest,
+    TaskPlan,
+    TaskStatus,
+    utc_now,
+)
 
 
 class InMemoryTaskStore:
@@ -43,7 +48,7 @@ class InMemoryTaskStore:
         task = self._require(task_id)
         task.plan = plan
         task.status = TaskStatus.PLANNED
-        task.updated_at = datetime.utcnow()
+        task.updated_at = utc_now()
         self.add_event(
             task_id,
             TaskStatus.PLANNED,
@@ -64,7 +69,7 @@ class InMemoryTaskStore:
     ) -> A2ATask:
         task = self._require(task_id)
         task.status = status
-        task.updated_at = datetime.utcnow()
+        task.updated_at = utc_now()
         if assigned_agent is not None:
             task.assigned_agent = assigned_agent
         self.add_event(task_id, status, message, agent=agent, payload=payload or {})
