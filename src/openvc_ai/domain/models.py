@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from enum import Enum
 from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class AgentStatus(str, Enum):
@@ -137,7 +142,7 @@ class ForecastResult(BaseModel):
     data_notes: list[str]
     news_analysis: str | None = None
     investment_memo: str | None = None
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=utc_now)
     elapsed_ms: float | None = None
     # Optional series data used by the frontend dashboard
     price_history: list[PricePoint] | None = None
@@ -278,7 +283,7 @@ class A2ATaskEvent(BaseModel):
     message: str
     agent: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
 
 
 class A2ATask(BaseModel):
@@ -291,8 +296,8 @@ class A2ATask(BaseModel):
     status: TaskStatus = TaskStatus.QUEUED
     assigned_agent: str | None = None
     plan: TaskPlan | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
     events: list[A2ATaskEvent] = Field(default_factory=list)
 
 
@@ -313,7 +318,7 @@ class MemoryRecord(BaseModel):
     kind: str
     content: str
     metadata: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class SystemStatus(BaseModel):
@@ -328,4 +333,4 @@ class SystemStatus(BaseModel):
     tools: list[ToolSpec] = Field(default_factory=list)
     active_tasks: int = 0
     memory_records: int = 0
-    checked_at: datetime = Field(default_factory=datetime.utcnow)
+    checked_at: datetime = Field(default_factory=utc_now)

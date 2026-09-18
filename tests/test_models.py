@@ -1,7 +1,9 @@
+from datetime import timedelta
+
 import pytest
 from pydantic import ValidationError
 
-from openvc_ai.domain.models import ForecastRequest
+from openvc_ai.domain.models import A2ATask, ForecastRequest
 
 
 def test_ticker_is_normalized_uppercase():
@@ -31,3 +33,10 @@ def test_defaults():
     assert req.horizon_days == 30
     assert req.include_news is True
     assert req.include_memo is False
+
+
+def test_task_timestamps_are_timezone_aware_utc():
+    task = A2ATask(task_type="forecast_stock")
+
+    assert task.created_at.utcoffset() == timedelta(0)
+    assert task.updated_at.utcoffset() == timedelta(0)
