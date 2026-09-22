@@ -1,7 +1,7 @@
 """Market data and news adapters with shared HTTP client, caching, and retries."""
 
 import asyncio
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
 import pandas as pd
@@ -66,7 +66,7 @@ async def _get_with_retry(
 
 def _demo_price_points(ticker: str, days: int = 120) -> list[PricePoint]:
     """Deterministic synthetic prices used when demo mode is enabled."""
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     base = 80.0 + (sum(ord(ch) for ch in ticker.upper()) % 90)
     points: list[PricePoint] = []
     for i in range(days):
@@ -79,7 +79,7 @@ def _demo_price_points(ticker: str, days: int = 120) -> list[PricePoint]:
 
 
 def _demo_news_items(ticker: str) -> list[NewsItem]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return [
         NewsItem(
             headline=f"{ticker.upper()} posts steady operating momentum in demo data",
@@ -212,18 +212,18 @@ class AlphaVantageMarketDataAdapter:
             return await self.daily_prices(ticker, outputsize="compact")
 
         if start_date is None:
-            start_date = date.today() - timedelta(days=365)
+            start_date = datetime.now(UTC).date() - timedelta(days=365)
         if end_date is None:
-            end_date = date.today()
+            end_date = datetime.now(UTC).date()
         if end_date < start_date:
             raise ValueError("end_date must be on or after start_date")
 
         cache_key = f"historical:{ticker}:{start_date.isoformat()}:{end_date.isoformat()}"
 
         async def _fetch() -> list[PricePoint]:
-            period1 = int(datetime.combine(start_date, datetime.min.time(), timezone.utc).timestamp())
+            period1 = int(datetime.combine(start_date, datetime.min.time(), UTC).timestamp())
             period2 = int(
-                datetime.combine(end_date + timedelta(days=1), datetime.min.time(), timezone.utc)
+                datetime.combine(end_date + timedelta(days=1), datetime.min.time(), UTC)
                 .timestamp()
             )
             response = await _get_with_retry(
@@ -247,7 +247,7 @@ class AlphaVantageMarketDataAdapter:
             closes = quote.get("close") or []
             points = [
                 PricePoint(
-                    timestamp=datetime.fromtimestamp(ts, tz=timezone.utc).date(),
+                    timestamp=datetime.fromtimestamp(ts, tz=UTC).date(),
                     close=float(close),
                 )
                 for ts, close in zip(timestamps, closes)
@@ -300,7 +300,7 @@ class FinnhubNewsAdapter:
         cache_key = f"news:{ticker}:{days_back}"
 
         async def _fetch() -> list[NewsItem]:
-            today = datetime.now(timezone.utc).date()
+            today = datetime.now(UTC).date()
             params = {
                 "symbol": ticker,
                 "from": (today - timedelta(days=days_back)).isoformat(),
@@ -314,7 +314,7 @@ class FinnhubNewsAdapter:
             for item in data[:20]:
                 published_at = None
                 if item.get("datetime"):
-                    published_at = datetime.fromtimestamp(item["datetime"], tz=timezone.utc)
+                    published_at = datetime.fromtimestamp(item["datetime"], tz=UTC)
                 items.append(
                     NewsItem(
                         headline=item.get("headline", ""),

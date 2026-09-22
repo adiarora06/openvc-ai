@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from openvc_ai import __version__
@@ -181,8 +181,9 @@ class AppRuntime:
         start_date: date | None = None
         end_date: date | None = None
         if request.start_date or request.end_date:
-            eval_start = request.start_date or (date.today() - timedelta(days=180))
-            eval_end = request.end_date or date.today()
+            today = datetime.now(UTC).date()
+            eval_start = request.start_date or (today - timedelta(days=180))
+            eval_end = request.end_date or today
             start_date = eval_start - timedelta(days=max(request.training_window_days * 3, 120))
             end_date = eval_end + timedelta(days=max(request.horizon_days * 3, 14))
         points = await self.market_data.historical_prices(request.ticker, start_date, end_date)
