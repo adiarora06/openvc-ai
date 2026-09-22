@@ -68,25 +68,24 @@ class PostgresMemoryStore:
             content=content,
             metadata=metadata or {},
         )
-        with self._lock:
-            with self._conn.transaction():
-                self._conn.execute(
-                    """
-                    INSERT INTO memory_records
-                        (id, session_id, kind, content, metadata, created_at, tier)
-                    VALUES
-                        (%s, %s, %s, %s, %s::jsonb, %s, 'short')
-                    """,
-                    (
-                        record.record_id,
-                        session_id,
-                        kind,
-                        content,
-                        json.dumps(metadata or {}),
-                        record.created_at,
-                    ),
-                )
-                self._evict_session(session_id)
+        with self._lock, self._conn.transaction():
+            self._conn.execute(
+                """
+                INSERT INTO memory_records
+                    (id, session_id, kind, content, metadata, created_at, tier)
+                VALUES
+                    (%s, %s, %s, %s, %s::jsonb, %s, 'short')
+                """,
+                (
+                    record.record_id,
+                    session_id,
+                    kind,
+                    content,
+                    json.dumps(metadata or {}),
+                    record.created_at,
+                ),
+            )
+            self._evict_session(session_id)
         return record
 
     def _evict_session(self, session_id: str) -> None:
@@ -149,23 +148,22 @@ class PostgresMemoryStore:
             content=content,
             metadata=metadata or {},
         )
-        with self._lock:
-            with self._conn.transaction():
-                self._conn.execute(
-                    """
-                    INSERT INTO memory_records
-                        (id, session_id, kind, content, metadata, created_at, tier)
-                    VALUES
-                        (%s, '__long_term__', %s, %s, %s::jsonb, %s, 'long')
-                    """,
-                    (
-                        record.record_id,
-                        kind,
-                        content,
-                        json.dumps(metadata or {}),
-                        record.created_at,
-                    ),
-                )
+        with self._lock, self._conn.transaction():
+            self._conn.execute(
+                """
+                INSERT INTO memory_records
+                    (id, session_id, kind, content, metadata, created_at, tier)
+                VALUES
+                    (%s, '__long_term__', %s, %s, %s::jsonb, %s, 'long')
+                """,
+                (
+                    record.record_id,
+                    kind,
+                    content,
+                    json.dumps(metadata or {}),
+                    record.created_at,
+                ),
+            )
         return record
 
     def long_term_recent(self, limit: int = 50) -> list[MemoryRecord]:

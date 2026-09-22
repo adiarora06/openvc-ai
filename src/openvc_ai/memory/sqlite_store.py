@@ -150,19 +150,18 @@ class SQLiteMemoryStore:
             content=content,
             metadata=metadata or {},
         )
-        with self._lock:
-            with self._conn:
-                self._conn.execute(
-                    "INSERT INTO memory_records (id, session_id, kind, content, metadata, created_at, tier) "
-                    "VALUES (?, '__long_term__', ?, ?, ?, ?, 'long')",
-                    (
-                        record.record_id,
-                        kind,
-                        content,
-                        json.dumps(metadata or {}),
-                        record.created_at.isoformat(),
-                    ),
-                )
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO memory_records (id, session_id, kind, content, metadata, created_at, tier) "
+                "VALUES (?, '__long_term__', ?, ?, ?, ?, 'long')",
+                (
+                    record.record_id,
+                    kind,
+                    content,
+                    json.dumps(metadata or {}),
+                    record.created_at.isoformat(),
+                ),
+            )
         return record
 
     def long_term_recent(self, limit: int = 50) -> list[MemoryRecord]:
