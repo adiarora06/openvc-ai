@@ -129,7 +129,7 @@ class CentralA2AOrchestrator:
                 plan=final.plan,
             )
         except Exception as exc:
-            logger.exception("A2A task failed: %s", exc)
+            logger.exception("A2A task failed")
             self.task_store.update_status(
                 task.task_id,
                 TaskStatus.FAILED,
