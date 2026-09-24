@@ -292,7 +292,7 @@ async def chat(request: Request, payload: dict):
             "model": response.model,
         }
     except Exception as exc:
-        logger.exception("Chat completion failed: %s", exc)
+        logger.exception("Chat completion failed")
         raise HTTPException(status_code=502, detail=f"LLM completion failed: {str(exc)}")
 
 
@@ -329,7 +329,7 @@ async def chat_stream(request: Request, payload: dict):
                 yield f"data: {json.dumps({'token': response.content})}\n\n"
                 yield f"data: {json.dumps({'done': True, 'provider': response.provider, 'model': response.model})}\n\n"
         except Exception as exc:
-            logger.exception("Chat stream failed: %s", exc)
+            logger.exception("Chat stream failed")
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
 
     return StreamingResponse(
