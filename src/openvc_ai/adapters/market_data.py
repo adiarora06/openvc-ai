@@ -28,7 +28,6 @@ async def get_http_client() -> httpx.AsyncClient:
                     timeout=settings.request_timeout_seconds,
                     limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
                     headers={"User-Agent": "OpenVC-AI/0.1.0"},
-                    verify=False,
                 )
     return _http_client
 
