@@ -41,23 +41,25 @@ async def _chat_completion_stream(
         "stream": True,
     }
     headers = {"Authorization": f"Bearer {api_key}", "Accept": "text/event-stream"}
-    async with httpx.AsyncClient(timeout=60) as client:
-        async with client.stream("POST", url, json=payload, headers=headers) as resp:
-            resp.raise_for_status()
-            async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                raw = line[6:]
-                if raw.strip() == "[DONE]":
-                    return
-                try:
-                    chunk = json.loads(raw)
-                    delta = chunk["choices"][0].get("delta", {})
-                    token = delta.get("content")
-                    if token:
-                        yield token
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    continue
+    async with (
+        httpx.AsyncClient(timeout=60) as client,
+        client.stream("POST", url, json=payload, headers=headers) as resp,
+    ):
+        resp.raise_for_status()
+        async for line in resp.aiter_lines():
+            if not line.startswith("data: "):
+                continue
+            raw = line[6:]
+            if raw.strip() == "[DONE]":
+                return
+            try:
+                chunk = json.loads(raw)
+                delta = chunk["choices"][0].get("delta", {})
+                token = delta.get("content")
+                if token:
+                    yield token
+            except (json.JSONDecodeError, KeyError, IndexError):
+                continue
 
 
 class GroqLLMAdapter(LLMPort):
